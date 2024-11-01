@@ -1,0 +1,5 @@
+.vscode
+.tig
+*.o
+tig
+.DS_Store

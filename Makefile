@@ -1,13 +1,14 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c2x -g
 TARGET = tig
-SRC = main.c path.c
+SRC = main.c path.c object-file.c
 OBJ = $(SRC:.c=.o)
+LDFLAGS = -lz
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

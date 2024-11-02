@@ -2,8 +2,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "zlib.h"
-
 void create_dir(const char *dir) {
   if (mkdir(dir, 0777) < 0) {
     perror(dir);

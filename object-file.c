@@ -1,11 +1,13 @@
 #include "object-file.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
 
+#include "error.h"
 #include "path.h"
 
 void decompress_object_file(char* hash) {
@@ -14,14 +16,12 @@ void decompress_object_file(char* hash) {
       snprintf(path, sizeof(path), ".tig/objects/%.2s/%s", hash, hash + 2);
 
   if ((unsigned long)p_size >= sizeof(path)) {
-    printf("Provided path is too long. Max path size: %d\n", PATH_MAX);
-    return;
+    die("Provided path is too long. Max path size is: %d", PATH_MAX);
   }
 
   FILE* file = fopen(path, "rb");
   if (!file) {
-    perror("Failed to open object file");
-    return;
+    die("Failed to open file %s: %s", path, strerror(errno));
   }
 
   /**
@@ -36,7 +36,7 @@ void decompress_object_file(char* hash) {
 
   int ret = inflateInit(&strm);
   if (ret != Z_OK) {
-    return;
+    die("Failed to initialize zlib stream");
   }
 
   /**
@@ -45,18 +45,17 @@ void decompress_object_file(char* hash) {
    */
   do {
     /**
-     * Read on bit at a time for the size of CHUNK of file.
+     * Read one byte at a time for the size of CHUNK of file.
      * If some fileoperation fails, terminate.
      * avail_in tells us how many bytes are left to process in the input buffer.
      */
     strm.avail_in = fread(in_buffer, 1, CHUNK, file);
     if (ferror(file)) {
       (void)inflateEnd(&strm);
-      fprintf(stderr, "Error handling file stream in decompression");
-      return;
+      die("Error handling file stream in decompression");
     }
     /**
-     * avail_in == 0 is euqivalent to the output-buffer being full
+     * avail_in == 0 is equivalient to no more input data being left to process.
      */
     if (strm.avail_in == 0) {
       break;
@@ -82,8 +81,9 @@ void decompress_object_file(char* hash) {
         case Z_DATA_ERROR:
         case Z_MEM_ERROR:
           (void)inflateEnd(&strm);
-          return;
+          die("zlib error: %d", ret);
       }
+      // char *content_start = strchr(out_buffer, '\0') + 1;
       fwrite(out_buffer, 1, CHUNK - strm.avail_out, stdout);
     } while (strm.avail_out == 0);
     /**

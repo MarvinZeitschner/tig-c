@@ -5,7 +5,7 @@
 
 #include "object-file.h"
 #include "path.h"
-#include "repository.h"
+#include "strbuf.h"
 
 int main(int argc, char** argv) {
   if (argc <= 1) {

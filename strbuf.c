@@ -11,13 +11,6 @@
  */
 char strbuf_slopbuf[1];
 
-/**
- * strbuf_init - Initialize an NUL terminated, dyanmic string buffer
- *
- * @sb: The string buffer to be initialized
- * @hint: Optional initial size of the dynamic strbuf
- *
- */
 void strbuf_init(struct strbuf *sb, size_t hint) {
   struct strbuf blank = STRBUF_INIT;
   memcpy(sb, &blank, sizeof(*sb));
@@ -26,13 +19,6 @@ void strbuf_init(struct strbuf *sb, size_t hint) {
   }
 }
 
-/**
- * strbuf_grow - Grow a given strbuf by a specified size_t
- *
- * @sb: Given strbuf to be grown
- * @extra: Extra size the strbuf should be grown by
- *
- */
 void strbuf_grow(struct strbuf *sb, size_t extra) {
   int new_buf = !sb->alloc;
   // TODO: add unsigned_overflow check
@@ -43,4 +29,10 @@ void strbuf_grow(struct strbuf *sb, size_t extra) {
   if (new_buf) {
     sb->buf[0] = '\0';
   }
+}
+
+void strbuf_addstr(struct strbuf *sb, char *str, size_t size) {
+  strbuf_grow(sb, size);
+  memcpy(sb->buf, str, size);
+  sb->len = sb->len + size;
 }

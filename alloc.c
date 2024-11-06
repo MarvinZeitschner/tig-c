@@ -9,6 +9,7 @@
  * @alloc: Pointer to a variable that holds current allocated size, which will
  * be updated
  * @size: Size of each individual element in buffer
+ *
  */
 void* alloc_grow_helper(void* p, long nr, unsigned long* alloc, size_t size) {
   void* tmp = NULL;
@@ -19,11 +20,14 @@ void* alloc_grow_helper(void* p, long nr, unsigned long* alloc, size_t size) {
    * If the given required size is bigger than the above n, assign n to the give
    * size
    */
-  if (nr > n) {
+  if ((unsigned long)nr > n) {
     n = nr;
   }
   if (SIZE_MAX / size >= n) {
     tmp = realloc(p, n * size);
+  }
+  if (tmp) {
+    *alloc = n;
   } else {
     free(p);
     *alloc = 0;

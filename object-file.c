@@ -9,6 +9,7 @@
 
 #include "error.h"
 #include "path.h"
+#include "strbuf.h"
 
 void decompress_object_file(char* hash) {
   char path[PATH_MAX];
@@ -33,6 +34,7 @@ void decompress_object_file(char* hash) {
   z_stream strm = {0};
   unsigned char in_buffer[CHUNK];
   unsigned char out_buffer[CHUNK];
+  struct strbuf sb = STRBUF_INIT;
 
   int ret = inflateInit(&strm);
   if (ret != Z_OK) {
@@ -83,13 +85,15 @@ void decompress_object_file(char* hash) {
           (void)inflateEnd(&strm);
           die("zlib error: %d", ret);
       }
-      // char *content_start = strchr(out_buffer, '\0') + 1;
-      fwrite(out_buffer, 1, CHUNK - strm.avail_out, stdout);
+      strbuf_addstr(&sb, (char*)out_buffer, CHUNK - strm.avail_out);
     } while (strm.avail_out == 0);
     /**
      *  We're done when inflate() return Z_STREAM_END
      */
   } while (ret != Z_STREAM_END);
+  char* removed_meta_obj = strchr(sb.buf, '\0') + 1;
+  fwrite(removed_meta_obj, 1, sb.len, stdout);
+  // TODO: Free sb
   (void)inflateEnd(&strm);
   return;
 }

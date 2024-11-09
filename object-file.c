@@ -93,7 +93,9 @@ void decompress_object_file(char* hash) {
   } while (ret != Z_STREAM_END);
   char* removed_meta_obj = strchr(sb.buf, '\0') + 1;
   fwrite(removed_meta_obj, 1, sb.len, stdout);
-  // TODO: Free sb
   (void)inflateEnd(&strm);
+
+  strbuf_release(&sb);
+
   return;
 }

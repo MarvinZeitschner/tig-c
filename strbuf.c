@@ -36,3 +36,10 @@ void strbuf_addstr(struct strbuf *sb, char *str, size_t size) {
   memcpy(sb->buf, str, size);
   sb->len = sb->len + size;
 }
+
+void strbuf_release(struct strbuf *sb) {
+  if (sb->alloc) {
+    free(sb->buf);
+    strbuf_init(sb, 0);
+  }
+}

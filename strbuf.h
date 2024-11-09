@@ -39,4 +39,12 @@ void strbuf_grow(struct strbuf *sb, size_t extra);
  */
 void strbuf_addstr(struct strbuf *sb, char *str, size_t size);
 
+/**
+ * strbuf_release - free the strbuf and reset it to 0
+ *
+ * @sb: strbuf that should be free-ed
+ *
+ */
+void strbuf_release(struct strbuf *sb);
+
 #endif

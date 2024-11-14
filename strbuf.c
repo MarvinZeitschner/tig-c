@@ -33,7 +33,7 @@ void strbuf_grow(struct strbuf *sb, size_t extra) {
 
 void strbuf_addstr(struct strbuf *sb, char *str, size_t size) {
   strbuf_grow(sb, size);
-  memcpy(sb->buf, str, size);
+  memcpy(sb->buf + sb->len, str, size);
   sb->len = sb->len + size;
 }
 

@@ -11,7 +11,7 @@
 #include "path.h"
 #include "strbuf.h"
 
-void decompress_object_file(char* hash) {
+void decompress_object_file(const char* hash) {
   char path[PATH_MAX];
   int p_size =
       snprintf(path, sizeof(path), ".tig/objects/%.2s/%s", hash, hash + 2);

@@ -3,6 +3,6 @@
 
 #define CHUNK 16384
 
-void decompress_object_file(char* hash);
+void decompress_object_file(const char* hash);
 
 #endif

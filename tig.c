@@ -13,7 +13,7 @@ static struct cmd_struct command_list[] = {
 };
 
 static struct cmd_struct* get_cmd(const char* name) {
-  for (int i = 0; i < ARRAY_SIZE(command_list); i++) {
+  for (size_t i = 0; i < ARRAY_SIZE(command_list); i++) {
     struct cmd_struct* cmd = command_list + i;
     if (!strcmp(name, cmd->name)) {
       return cmd;

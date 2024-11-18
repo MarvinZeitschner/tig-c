@@ -1,0 +1,1 @@
+echo "hello world" > test_object_file.txt

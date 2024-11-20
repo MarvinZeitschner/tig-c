@@ -10,6 +10,7 @@
 static struct cmd_struct command_list[] = {
     {"init", init},
     {"cat-file", cat_file},
+    {"hash-file", hash_file},
 };
 
 static struct cmd_struct* get_cmd(const char* name) {

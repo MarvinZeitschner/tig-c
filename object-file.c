@@ -2,6 +2,8 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,14 +13,18 @@
 #include "path.h"
 #include "strbuf.h"
 
-void decompress_object_file(const char* hash) {
-  char path[PATH_MAX];
+void get_object_path(char buffer[], const char* hash) {
   int p_size =
-      snprintf(path, sizeof(path), ".tig/objects/%.2s/%s", hash, hash + 2);
+      snprintf(buffer, PATH_MAX, ".tig/objects/%.2s/%s", hash, hash + 2);
 
-  if ((unsigned long)p_size >= sizeof(path)) {
+  if ((unsigned long)p_size >= PATH_MAX) {
     die("Provided path is too long. Max path size is: %d", PATH_MAX);
   }
+}
+
+void decompress_object_file(const char* hash) {
+  char path[PATH_MAX] = {'\0'};
+  get_object_path(path, hash);
 
   FILE* file = fopen(path, "rb");
   if (!file) {
@@ -97,5 +103,43 @@ void decompress_object_file(const char* hash) {
 
   strbuf_release(&sb);
 
+  return;
+}
+
+void hash_object_file(const char* path) {
+  FILE* file = fopen(path, "r");
+  if (!file) {
+    die("Failed to open file: %s", path);
+  }
+
+  unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
+  unsigned char in_buffer[CHUNK] = "\0";
+  size_t bytes_read = 0;
+  EVP_MD_CTX* hashctx = EVP_MD_CTX_new();
+
+  EVP_MD_CTX_init(hashctx);
+  EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
+
+  do {
+    bytes_read = fread(in_buffer, 1, CHUNK, file);
+    if (!bytes_read) {
+      break;
+    }
+
+    EVP_DigestUpdate(hashctx, in_buffer, bytes_read);
+  } while (bytes_read == CHUNK);
+
+  unsigned int outlen;
+  EVP_DigestFinal_ex(hashctx, hash, &outlen);
+  EVP_MD_CTX_free(hashctx);
+
+  fclose(file);
+
+  printf("SHA-1 hash: ");
+  char test[EVP_MAX_MD_SIZE];
+  for (unsigned int i = 0; i < outlen; i++) {
+    snprintf(test + strlen(test), EVP_MAX_MD_SIZE, "%02x", hash[i]);
+  }
+  printf("%s\n", test);
   return;
 }

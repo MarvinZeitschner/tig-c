@@ -3,3 +3,4 @@
 *.o
 tig
 .DS_Store
+*.txt

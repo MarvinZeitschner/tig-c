@@ -2,3 +2,4 @@
 
 int init(UNUSED int argc, UNUSED const char** argv);
 int cat_file(UNUSED int argc, const char** argv);
+int hash_file(UNUSED int argc, const char** argv);

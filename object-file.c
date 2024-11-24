@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <zlib.h>
 
 #include "error.h"
@@ -106,11 +107,28 @@ void decompress_object_file(const char* hash) {
   return;
 }
 
+// TODO: add buffer param to return hash, bc of -w flag
 void hash_object_file(const char* path) {
   FILE* file = fopen(path, "r");
   if (!file) {
     die("Failed to open file: %s", path);
   }
+  struct stat st;
+
+  /**
+   * Get metadata from file, as it has to be included in the hash
+   */
+  if (stat(path, &st) != 0) {
+    die("Failed to get metadata from file: %s", path);
+  }
+
+  /**
+   * Is strbuf more useful here?
+   * If not: TODO: boundary check, bc the snprintf shouldnt cut off data we need
+   * in the compression
+   */
+  char metadata[METADATA_MAX] = "\0";
+  snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
 
   unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
   unsigned char in_buffer[CHUNK] = "\0";
@@ -119,6 +137,9 @@ void hash_object_file(const char* path) {
 
   EVP_MD_CTX_init(hashctx);
   EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
+
+  // TODO: Boundary check
+  EVP_DigestUpdate(hashctx, metadata, strlen(metadata) + 1);
 
   do {
     bytes_read = fread(in_buffer, 1, CHUNK, file);
@@ -136,10 +157,10 @@ void hash_object_file(const char* path) {
   fclose(file);
 
   printf("SHA-1 hash: ");
-  char test[EVP_MAX_MD_SIZE];
+  char str_hash[EVP_MAX_MD_SIZE];
   for (unsigned int i = 0; i < outlen; i++) {
-    snprintf(test + strlen(test), EVP_MAX_MD_SIZE, "%02x", hash[i]);
+    snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
   }
-  printf("%s\n", test);
+  printf("%s\n", str_hash);
   return;
 }

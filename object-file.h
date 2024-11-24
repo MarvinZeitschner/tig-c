@@ -2,6 +2,7 @@
 #define OBJECT_FILE_H
 
 #define CHUNK 16384
+#define METADATA_MAX 256
 
 void get_object_path(char buffer[], const char* hash);
 

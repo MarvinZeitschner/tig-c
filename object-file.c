@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <openssl/evp.h>
-#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -153,7 +152,6 @@ void hash_object_file(const char* path) {
   unsigned int outlen;
   EVP_DigestFinal_ex(hashctx, hash, &outlen);
   EVP_MD_CTX_free(hashctx);
-
   fclose(file);
 
   printf("SHA-1 hash: ");
@@ -162,5 +160,21 @@ void hash_object_file(const char* path) {
     snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
   }
   printf("%s\n", str_hash);
+
+  char dir_path[PATH_MAX];
+  char obj_path[PATH_MAX];
+  /**
+   * TODO: boundary checks
+   * we do not want snprintf to truncate the object file paths
+   * maybe strbuf really is the better approach
+   */
+  snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
+  snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash, str_hash + 2);
+  printf("dir_path: %s\n", dir_path);
+  printf("obj_path: %s\n", obj_path);
+
+  create_dir(dir_path);
+  write_to_file(obj_path, "test example\n hello world");
+
   return;
 }

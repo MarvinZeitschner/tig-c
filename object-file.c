@@ -154,12 +154,11 @@ void hash_object_file(const char* path) {
   EVP_MD_CTX_free(hashctx);
   fclose(file);
 
-  printf("SHA-1 hash: ");
   char str_hash[EVP_MAX_MD_SIZE];
   for (unsigned int i = 0; i < outlen; i++) {
     snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
   }
-  printf("%s\n", str_hash);
+  printf("SHA-1 hash: %s\n", str_hash);
 
   char dir_path[PATH_MAX];
   char obj_path[PATH_MAX];

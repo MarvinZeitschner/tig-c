@@ -1,5 +1,5 @@
 #include "macros.h"
 
-int init(UNUSED int argc, UNUSED const char** argv);
-int cat_file(UNUSED int argc, const char** argv);
-int hash_file(UNUSED int argc, const char** argv);
+int init(int argc, UNUSED const char **argv);
+int cat_file(int argc, const char **argv);
+int hash_object(int argc, const char **argv);

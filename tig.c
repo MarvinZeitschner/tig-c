@@ -7,12 +7,6 @@
 #include "error.h"
 #include "macros.h"
 
-static struct cmd_struct command_list[] = {
-    {"init", init},
-    {"cat-file", cat_file},
-    {"hash-file", hash_file},
-};
-
 static struct cmd_struct* get_cmd(const char* name) {
   for (size_t i = 0; i < ARRAY_SIZE(command_list); i++) {
     struct cmd_struct* cmd = command_list + i;
@@ -33,7 +27,7 @@ int exec_cmd(int argc, const char** argv) {
   if (!cmd) {
     return error("Unknown command: %s\n", argv[1]);
   }
-  cmd->fn(argc, argv);
+  cmd->fn(argc - 2, argv + 2);
 
   return 0;
 }

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <openssl/evp.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,7 +14,7 @@
 #include "path.h"
 #include "strbuf.h"
 
-void get_object_path(char buffer[], const char* hash) {
+void get_object_path(char buffer[], const char *hash) {
   int p_size =
       snprintf(buffer, PATH_MAX, ".tig/objects/%.2s/%s", hash, hash + 2);
 
@@ -22,11 +23,11 @@ void get_object_path(char buffer[], const char* hash) {
   }
 }
 
-void decompress_object_file(const char* hash) {
+void decompress_object_file(const char *hash) {
   char path[PATH_MAX] = {'\0'};
   get_object_path(path, hash);
 
-  FILE* file = fopen(path, "rb");
+  FILE *file = fopen(path, "rb");
   if (!file) {
     die("Failed to open file %s: %s", path, strerror(errno));
   }
@@ -84,20 +85,20 @@ void decompress_object_file(const char* hash) {
       ret = inflate(&strm, Z_NO_FLUSH);
       assert(ret != Z_STREAM_ERROR);
       switch (ret) {
-        case Z_NEED_DICT:
-          ret = Z_DATA_ERROR;
-        case Z_DATA_ERROR:
-        case Z_MEM_ERROR:
-          (void)inflateEnd(&strm);
-          die("zlib error: %d", ret);
+      case Z_NEED_DICT:
+        ret = Z_DATA_ERROR;
+      case Z_DATA_ERROR:
+      case Z_MEM_ERROR:
+        (void)inflateEnd(&strm);
+        die("zlib error: %d", ret);
       }
-      strbuf_addstr(&sb, (char*)out_buffer, CHUNK - strm.avail_out);
+      strbuf_addstr(&sb, (char *)out_buffer, CHUNK - strm.avail_out);
     } while (strm.avail_out == 0);
     /**
      *  We're done when inflate() return Z_STREAM_END
      */
   } while (ret != Z_STREAM_END);
-  char* removed_meta_obj = strchr(sb.buf, '\0') + 1;
+  char *removed_meta_obj = strchr(sb.buf, '\0') + 1;
   fwrite(removed_meta_obj, 1, sb.len, stdout);
   (void)inflateEnd(&strm);
 
@@ -107,16 +108,13 @@ void decompress_object_file(const char* hash) {
 }
 
 // TODO: add buffer param to return hash, bc of -w flag
-void hash_object_file(const char* path) {
-  FILE* file = fopen(path, "r");
+void hash_object_file(const char *path) {
+  FILE *file = fopen(path, "rb");
   if (!file) {
     die("Failed to open file: %s", path);
   }
   struct stat st;
 
-  /**
-   * Get metadata from file, as it has to be included in the hash
-   */
   if (stat(path, &st) != 0) {
     die("Failed to get metadata from file: %s", path);
   }
@@ -132,7 +130,7 @@ void hash_object_file(const char* path) {
   unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
   unsigned char in_buffer[CHUNK] = "\0";
   size_t bytes_read = 0;
-  EVP_MD_CTX* hashctx = EVP_MD_CTX_new();
+  EVP_MD_CTX *hashctx = EVP_MD_CTX_new();
 
   EVP_MD_CTX_init(hashctx);
   EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
@@ -152,7 +150,7 @@ void hash_object_file(const char* path) {
   unsigned int outlen;
   EVP_DigestFinal_ex(hashctx, hash, &outlen);
   EVP_MD_CTX_free(hashctx);
-  fclose(file);
+  // fclose(file);
 
   char str_hash[EVP_MAX_MD_SIZE];
   for (unsigned int i = 0; i < outlen; i++) {
@@ -172,8 +170,187 @@ void hash_object_file(const char* path) {
   printf("dir_path: %s\n", dir_path);
   printf("obj_path: %s\n", obj_path);
 
-  create_dir(dir_path);
-  write_to_file(obj_path, "test example\n hello world");
+  // --------------- zlib magic --------------- //
+  rewind(file);
+
+  FILE *obj_file = fopen(obj_path, "wb");
+  if (!obj_file) {
+    die("Failed to open file %s: %s", obj_path, strerror(errno));
+  }
+
+  int ret, flush;
+  unsigned have;
+  z_stream strm = {0};
+  unsigned char in[CHUNK] = {"\0"};
+  unsigned char out[CHUNK] = {"\0"};
+
+  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+  if (ret != Z_OK) {
+    fclose(file);
+    fclose(obj_file);
+    die("Failed to initialize zlib");
+  }
+  /**
+   * Append the metadata to the in buffer to get compressed
+   */
+  strcpy((char *)in, metadata);
+  strcat((char *)in, "\0");
+  strm.avail_in = strlen((char *)in) + 1;
+  strm.next_in = in;
+  strm.avail_out = CHUNK;
+  strm.next_out = out;
+  ret = deflate(&strm, Z_NO_FLUSH);
+  assert(ret != Z_STREAM_ERROR);
+  have = CHUNK - strm.avail_out;
+  if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
+    (void)deflateEnd(&strm);
+    // return Z_ERRNO;
+  }
+
+  do {
+    strm.avail_in = fread(in, 1, CHUNK, file);
+    if (ferror(file)) {
+      perror("");
+      (void)deflateEnd(&strm);
+      fclose(file);
+      fclose(obj_file);
+      // return Z_ERRNO;
+    }
+    flush = feof(file) ? Z_FINISH : Z_NO_FLUSH;
+    strm.next_in = in;
+
+    do {
+      strm.avail_out = CHUNK;
+      strm.next_out = out;
+      ret = deflate(&strm, flush);
+      assert(ret != Z_STREAM_ERROR);
+      have = CHUNK - strm.avail_out;
+      if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
+        (void)deflateEnd(&strm);
+        // return Z_ERRNO;
+      }
+    } while (strm.avail_out == 0);
+  } while (flush != Z_FINISH);
+  assert(ret == Z_STREAM_END);
+
+  (void)deflateEnd(&strm);
+  fclose(file);
+  fclose(obj_file);
+
+  //
+  //
+  //
+  // return Z_OK;
+
+  // create_dir(dir_path);
+
+  // compress_buf(metadata, strlen(metadata) + 1, obj_path);
+  // compress_file(path, obj_path);
 
   return;
+}
+
+int compress_buf(const char *buf, size_t size, const char *path_to_write) {
+  int ret;
+  unsigned have;
+  z_stream strm = {0};
+  unsigned char out[CHUNK];
+
+  FILE *obj_file = fopen(path_to_write, "wb");
+  if (!obj_file) {
+    fprintf(stderr, "Failed to open file %s: %s\n", path_to_write,
+            strerror(errno));
+    return Z_ERRNO;
+  }
+
+  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+  if (ret != Z_OK) {
+    fprintf(stderr, "Failed to initialize zlib: %d\n", ret);
+    fclose(obj_file);
+    return ret;
+  }
+
+  strm.next_in = (unsigned char *)buf;
+  strm.avail_in = size;
+
+  do {
+    strm.avail_out = CHUNK;
+    strm.next_out = out;
+
+    ret = deflate(&strm, Z_FINISH);
+    if (ret != Z_OK && ret != Z_STREAM_END) {
+      fprintf(stderr, "Error during compression: %d\n", ret);
+      (void)deflateEnd(&strm);
+      fclose(obj_file);
+      return ret;
+    }
+
+    have = CHUNK - strm.avail_out;
+    if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
+      fprintf(stderr, "Error writing to file %s\n", path_to_write);
+      (void)deflateEnd(&strm);
+      fclose(obj_file);
+      return Z_ERRNO;
+    }
+  } while (ret != Z_STREAM_END);
+
+  (void)deflateEnd(&strm);
+  fclose(obj_file);
+
+  return Z_OK;
+}
+
+int compress_file(const char *path, const char *path_to_write) {
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    fclose(file);
+  }
+  FILE *obj_file = fopen(path_to_write, "ab");
+  if (!obj_file) {
+    die("Failed to open file %s: %s", path_to_write, strerror(errno));
+  }
+
+  int ret, flush;
+  unsigned have;
+  z_stream strm = {0};
+  unsigned char in[CHUNK];
+  unsigned char out[CHUNK];
+
+  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+  if (ret != Z_OK) {
+    fclose(file);
+    fclose(obj_file);
+    die("Failed to initialize zlib");
+  }
+  do {
+    strm.avail_in = fread(in, 1, CHUNK, file);
+    if (ferror(file)) {
+      perror("");
+      (void)deflateEnd(&strm);
+      fclose(file);
+      fclose(obj_file);
+      return Z_ERRNO;
+    }
+    flush = feof(file) ? Z_FINISH : Z_NO_FLUSH;
+    strm.next_in = in;
+
+    do {
+      strm.avail_out = CHUNK;
+      strm.next_out = out;
+      ret = deflate(&strm, flush);
+      assert(ret != Z_STREAM_ERROR);
+      have = CHUNK - strm.avail_out;
+      if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
+        (void)deflateEnd(&strm);
+        return Z_ERRNO;
+      }
+    } while (strm.avail_out == 0);
+  } while (flush != Z_FINISH);
+  assert(ret == Z_STREAM_END);
+
+  (void)deflateEnd(&strm);
+  fclose(file);
+  fclose(obj_file);
+
+  return Z_OK;
 }

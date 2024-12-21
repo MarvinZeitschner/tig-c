@@ -107,70 +107,21 @@ void decompress_object_file(const char *hash) {
   return;
 }
 
-// TODO: add buffer param to return hash, bc of -w flag
-void hash_object_file(const char *path) {
+void compress_file_to_obj_file(const char *path) {
+  char metadata[METADATA_MAX] = {"\0"};
+  char dir_path[PATH_MAX] = {"\0"};
+  char obj_path[PATH_MAX] = {"\0"};
+  hash_object_file(metadata, obj_path, dir_path, path);
+
   FILE *file = fopen(path, "rb");
   if (!file) {
     die("Failed to open file: %s", path);
   }
-  struct stat st;
 
-  if (stat(path, &st) != 0) {
-    die("Failed to get metadata from file: %s", path);
-  }
-
-  /**
-   * Is strbuf more useful here?
-   * If not: TODO: boundary check, bc the snprintf shouldnt cut off data we need
-   * in the compression
-   */
-  char metadata[METADATA_MAX] = "\0";
-  snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
-
-  unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
-  unsigned char in_buffer[CHUNK] = "\0";
-  size_t bytes_read = 0;
-  EVP_MD_CTX *hashctx = EVP_MD_CTX_new();
-
-  EVP_MD_CTX_init(hashctx);
-  EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
-
-  // TODO: Boundary check
-  EVP_DigestUpdate(hashctx, metadata, strlen(metadata) + 1);
-
-  do {
-    bytes_read = fread(in_buffer, 1, CHUNK, file);
-    if (!bytes_read) {
-      break;
-    }
-
-    EVP_DigestUpdate(hashctx, in_buffer, bytes_read);
-  } while (bytes_read == CHUNK);
-
-  unsigned int outlen;
-  EVP_DigestFinal_ex(hashctx, hash, &outlen);
-  EVP_MD_CTX_free(hashctx);
-  // fclose(file);
-
-  char str_hash[EVP_MAX_MD_SIZE];
-  for (unsigned int i = 0; i < outlen; i++) {
-    snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
-  }
-  printf("SHA-1 hash: %s\n", str_hash);
-
-  char dir_path[PATH_MAX];
-  char obj_path[PATH_MAX];
-  /**
-   * TODO: boundary checks
-   * we do not want snprintf to truncate the object file paths
-   * maybe strbuf really is the better approach
-   */
-  snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
-  snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash, str_hash + 2);
-  printf("dir_path: %s\n", dir_path);
-  printf("obj_path: %s\n", obj_path);
+  create_dir(dir_path);
 
   // --------------- zlib magic --------------- //
+
   rewind(file);
 
   FILE *obj_file = fopen(obj_path, "wb");
@@ -237,17 +188,73 @@ void hash_object_file(const char *path) {
   fclose(file);
   fclose(obj_file);
 
-  //
-  //
-  //
-  // return Z_OK;
-
-  // create_dir(dir_path);
-
-  // compress_buf(metadata, strlen(metadata) + 1, obj_path);
-  // compress_file(path, obj_path);
-
   return;
+}
+
+// TODO: add buffer param to return hash, bc of -w flag
+int hash_object_file(char *metadata, char *obj_path, char *dir_path,
+                     const char *path) {
+
+  struct stat st;
+
+  if (stat(path, &st) != 0) {
+    return -1;
+  }
+
+  /**
+   * Is strbuf more useful here?
+   * If not: TODO: boundary check, bc the snprintf shouldnt cut off data we need
+   * in the compression
+   */
+  snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
+
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    return -1;
+  }
+
+  unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
+  unsigned char in_buffer[CHUNK] = "\0";
+  size_t bytes_read = 0;
+  EVP_MD_CTX *hashctx = EVP_MD_CTX_new();
+
+  EVP_MD_CTX_init(hashctx);
+  EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
+
+  // TODO: Boundary check
+  EVP_DigestUpdate(hashctx, metadata, strlen(metadata) + 1);
+
+  do {
+    bytes_read = fread(in_buffer, 1, CHUNK, file);
+    if (!bytes_read) {
+      break;
+    }
+
+    EVP_DigestUpdate(hashctx, in_buffer, bytes_read);
+  } while (bytes_read == CHUNK);
+
+  unsigned int outlen;
+  EVP_DigestFinal_ex(hashctx, hash, &outlen);
+  EVP_MD_CTX_free(hashctx);
+  fclose(file);
+
+  char str_hash[EVP_MAX_MD_SIZE];
+  for (unsigned int i = 0; i < outlen; i++) {
+    snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
+  }
+  printf("SHA-1 hash: %s\n", str_hash);
+
+  /**
+   * TODO: boundary checks
+   * we do not want snprintf to truncate the object file paths
+   * maybe strbuf really is the better approach
+   */
+  snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
+  snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash, str_hash + 2);
+  printf("dir_path: %s\n", dir_path);
+  printf("obj_path: %s\n", obj_path);
+
+  return 1;
 }
 
 int compress_buf(const char *buf, size_t size, const char *path_to_write) {

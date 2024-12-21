@@ -10,7 +10,10 @@ void get_object_path(char buffer[], const char *hash);
 
 void decompress_object_file(const char *hash);
 
-void hash_object_file(const char *path);
+void compress_file_to_obj_file(const char *path);
+
+int hash_object_file(char *metadata, char *dir_path, char *obj_path,
+                     const char *path);
 
 int compress_file(const char *path, const char *path_to_write);
 

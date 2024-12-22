@@ -20,6 +20,8 @@ void object_file_init(struct object_file *of);
 
 int object_file_get(struct object_file *of, const char *path);
 
+void object_file_release(struct object_file *of);
+
 //__
 
 void get_object_path(char buffer[], const char *hash);

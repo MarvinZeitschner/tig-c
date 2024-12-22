@@ -41,9 +41,22 @@ int object_file_get(struct object_file *of, const char *path) {
 
   strbuf_addf(&of->metadata, "blob %lld", of->t_size);
 
-  hash_object_file(of, path);
+  if (hash_object_file(of, path) != 0) {
+    return -1;
+  }
 
   return 0;
+}
+
+void object_file_release(struct object_file *of) {
+  strbuf_release(&of->t_path);
+  strbuf_release(&of->dir_path);
+  strbuf_release(&of->obj_path);
+  strbuf_release(&of->metadata);
+
+  of->t_size = 0;
+  char blank_hash[EVP_MAX_MD_SIZE];
+  memcpy(of->hash, blank_hash, EVP_MAX_MD_SIZE);
 }
 
 // ----

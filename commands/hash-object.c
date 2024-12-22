@@ -1,7 +1,6 @@
 #include "error.h"
 #include "macros.h"
 #include "object-file.h"
-#include "path.h"
 #include <stdio.h>
 #include <unistd.h>
 
@@ -30,7 +29,10 @@ int hash_object(int argc, const char *argv[]) {
 
   struct object_file of;
   object_file_init(&of);
-  object_file_get(&of, path);
+  if (object_file_get(&of, path) != 0) {
+    object_file_release(&of);
+    return -1;
+  }
 
   // printf("\n\n %s,\n %s,\n %s,\n %s,\n %s,\n %d\n \n", of.t_path.buf,
   //        of.dir_path.buf, of.obj_path.buf, of.hash, of.metadata.buf,
@@ -39,8 +41,13 @@ int hash_object(int argc, const char *argv[]) {
   printf("%s\n", of.hash);
 
   if (mode == WRITE_MODE) {
-    compress_file_to_obj_file(&of, path);
+    if (compress_file_to_obj_file(&of, path) != 0) {
+      object_file_release(&of);
+      return -1;
+    }
   }
+
+  object_file_release(&of);
 
   return 0;
 }

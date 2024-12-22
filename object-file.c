@@ -107,10 +107,11 @@ void decompress_object_file(const char *hash) {
   return;
 }
 
+// TODO: add buffer param to return hash, bc of -w flag
 int compress_file_to_obj_file(const char *path) {
-  char metadata[METADATA_MAX] = {0};
-  char dir_path[PATH_MAX] = {0};
-  char obj_path[PATH_MAX] = {0};
+  char metadata[METADATA_MAX];
+  char dir_path[PATH_MAX];
+  char obj_path[PATH_MAX];
   if (hash_object_file(metadata, obj_path, dir_path, path) != 0) {
     return -1;
   }
@@ -133,8 +134,8 @@ int compress_file_to_obj_file(const char *path) {
   int ret, flush;
   unsigned have;
   z_stream strm = {0};
-  unsigned char in[CHUNK] = {"\0"};
-  unsigned char out[CHUNK] = {"\0"};
+  unsigned char in[CHUNK];
+  unsigned char out[CHUNK];
 
   ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
   if (ret != Z_OK) {
@@ -201,37 +202,33 @@ int compress_file_to_obj_file(const char *path) {
   return 0;
 }
 
-// TODO: add buffer param to return hash, bc of -w flag
 int hash_object_file(char *metadata, char *obj_path, char *dir_path,
                      const char *path) {
-
   struct stat st;
 
   if (stat(path, &st) != 0) {
     return -1;
   }
 
-  /**
-   * Is strbuf more useful here?
-   * If not: TODO: boundary check, bc the snprintf shouldnt cut off data we need
-   * in the compression
-   */
-  snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
+  unsigned int len = snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
+  if (len > METADATA_MAX) {
+    error("Created file metadata is too big");
+    return -1;
+  }
 
   FILE *file = fopen(path, "rb");
   if (!file) {
     return -1;
   }
 
-  unsigned char hash[EVP_MAX_MD_SIZE] = "\0";
-  unsigned char in_buffer[CHUNK] = "\0";
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned char in_buffer[CHUNK];
   size_t bytes_read = 0;
   EVP_MD_CTX *hashctx = EVP_MD_CTX_new();
 
   EVP_MD_CTX_init(hashctx);
   EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
 
-  // TODO: Boundary check
   EVP_DigestUpdate(hashctx, metadata, strlen(metadata) + 1);
 
   do {
@@ -254,120 +251,19 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
   }
   printf("SHA-1 hash: %s\n", str_hash);
 
-  /**
-   * TODO: boundary checks
-   * we do not want snprintf to truncate the object file paths
-   * maybe strbuf really is the better approach
-   */
-  snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
-  snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash, str_hash + 2);
+  len = snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
+  if (len > PATH_MAX) {
+    error("Object file path is too long");
+    return -1;
+  }
+  len = snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash,
+                 str_hash + 2);
+  if (len > PATH_MAX) {
+    error("Object file path is too long");
+    return -1;
+  }
   printf("dir_path: %s\n", dir_path);
   printf("obj_path: %s\n", obj_path);
 
   return 0;
-}
-
-int compress_buf(const char *buf, size_t size, const char *path_to_write) {
-  int ret;
-  unsigned have;
-  z_stream strm = {0};
-  unsigned char out[CHUNK];
-
-  FILE *obj_file = fopen(path_to_write, "wb");
-  if (!obj_file) {
-    fprintf(stderr, "Failed to open file %s: %s\n", path_to_write,
-            strerror(errno));
-    return Z_ERRNO;
-  }
-
-  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
-  if (ret != Z_OK) {
-    fprintf(stderr, "Failed to initialize zlib: %d\n", ret);
-    fclose(obj_file);
-    return ret;
-  }
-
-  strm.next_in = (unsigned char *)buf;
-  strm.avail_in = size;
-
-  do {
-    strm.avail_out = CHUNK;
-    strm.next_out = out;
-
-    ret = deflate(&strm, Z_FINISH);
-    if (ret != Z_OK && ret != Z_STREAM_END) {
-      fprintf(stderr, "Error during compression: %d\n", ret);
-      (void)deflateEnd(&strm);
-      fclose(obj_file);
-      return ret;
-    }
-
-    have = CHUNK - strm.avail_out;
-    if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
-      fprintf(stderr, "Error writing to file %s\n", path_to_write);
-      (void)deflateEnd(&strm);
-      fclose(obj_file);
-      return Z_ERRNO;
-    }
-  } while (ret != Z_STREAM_END);
-
-  (void)deflateEnd(&strm);
-  fclose(obj_file);
-
-  return Z_OK;
-}
-
-int compress_file(const char *path, const char *path_to_write) {
-  FILE *file = fopen(path, "rb");
-  if (!file) {
-    fclose(file);
-  }
-  FILE *obj_file = fopen(path_to_write, "ab");
-  if (!obj_file) {
-    die("Failed to open file %s: %s", path_to_write, strerror(errno));
-  }
-
-  int ret, flush;
-  unsigned have;
-  z_stream strm = {0};
-  unsigned char in[CHUNK];
-  unsigned char out[CHUNK];
-
-  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
-  if (ret != Z_OK) {
-    fclose(file);
-    fclose(obj_file);
-    die("Failed to initialize zlib");
-  }
-  do {
-    strm.avail_in = fread(in, 1, CHUNK, file);
-    if (ferror(file)) {
-      perror("");
-      (void)deflateEnd(&strm);
-      fclose(file);
-      fclose(obj_file);
-      return Z_ERRNO;
-    }
-    flush = feof(file) ? Z_FINISH : Z_NO_FLUSH;
-    strm.next_in = in;
-
-    do {
-      strm.avail_out = CHUNK;
-      strm.next_out = out;
-      ret = deflate(&strm, flush);
-      assert(ret != Z_STREAM_ERROR);
-      have = CHUNK - strm.avail_out;
-      if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
-        (void)deflateEnd(&strm);
-        return Z_ERRNO;
-      }
-    } while (strm.avail_out == 0);
-  } while (flush != Z_FINISH);
-  assert(ret == Z_STREAM_END);
-
-  (void)deflateEnd(&strm);
-  fclose(file);
-  fclose(obj_file);
-
-  return Z_OK;
 }

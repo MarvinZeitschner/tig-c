@@ -107,15 +107,8 @@ void decompress_object_file(const char *hash) {
   return;
 }
 
-// TODO: add buffer param to return hash, bc of -w flag
-int compress_file_to_obj_file(const char *path) {
-  char metadata[METADATA_MAX];
-  char dir_path[PATH_MAX];
-  char obj_path[PATH_MAX];
-  if (hash_object_file(metadata, obj_path, dir_path, path) != 0) {
-    return -1;
-  }
-
+int compress_file_to_obj_file(char *metadata, char *dir_path, char *obj_path,
+                              const char *path) {
   create_dir(dir_path);
 
   FILE *file = fopen(path, "rb");
@@ -207,6 +200,7 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
   struct stat st;
 
   if (stat(path, &st) != 0) {
+    perror("");
     return -1;
   }
 
@@ -249,7 +243,7 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
   for (unsigned int i = 0; i < outlen; i++) {
     snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
   }
-  printf("SHA-1 hash: %s\n", str_hash);
+  printf("%s\n", str_hash);
 
   len = snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
   if (len > PATH_MAX) {
@@ -262,8 +256,6 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
     error("Object file path is too long");
     return -1;
   }
-  printf("dir_path: %s\n", dir_path);
-  printf("obj_path: %s\n", obj_path);
 
   return 0;
 }

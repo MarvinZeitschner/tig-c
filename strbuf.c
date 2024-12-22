@@ -1,5 +1,6 @@
 #include "strbuf.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,7 +22,7 @@ void strbuf_init(struct strbuf *sb, size_t hint) {
 
 void strbuf_grow(struct strbuf *sb, size_t extra) {
   int new_buf = !sb->alloc;
-  // TODO: add unsigned_overflow check
+
   if (new_buf) {
     sb->buf = NULL;
   }
@@ -42,4 +43,23 @@ void strbuf_release(struct strbuf *sb) {
     free(sb->buf);
     strbuf_init(sb, 0);
   }
+}
+
+void strbuf_addf(struct strbuf *sb, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+
+  int needed = vsnprintf(NULL, 0, fmt, args);
+
+  if (needed < 0) {
+    va_end(args);
+    die("vsnprintf");
+  }
+
+  strbuf_grow(sb, needed);
+
+  vsnprintf(sb->buf + sb->len, needed + 1, fmt, args);
+  sb->len += needed;
+
+  va_end(args);
 }

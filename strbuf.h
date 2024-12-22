@@ -1,6 +1,7 @@
 #ifndef STRBUF_H
 #define STRBUF_H
 
+#include <stdarg.h>
 #include <stdlib.h>
 
 extern char strbuf_slopbuf[];
@@ -46,5 +47,7 @@ void strbuf_addstr(struct strbuf *sb, char *str, size_t size);
  *
  */
 void strbuf_release(struct strbuf *sb);
+
+void strbuf_addf(struct strbuf *sb, const char *fmt, ...);
 
 #endif

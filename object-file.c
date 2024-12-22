@@ -14,6 +14,40 @@
 #include "path.h"
 #include "strbuf.h"
 
+void object_file_init(struct object_file *of) {
+  struct object_file blank = {0};
+
+  strbuf_init(&blank.t_path, 0);
+  strbuf_init(&blank.dir_path, 0);
+  strbuf_init(&blank.obj_path, 0);
+  strbuf_init(&blank.metadata, 0);
+
+  // strbuf_addstr(&blank.t_path, path, sizeof(path));
+
+  memcpy(of, &blank, sizeof(blank));
+}
+
+int object_file_get(struct object_file *of, const char *path) {
+  strbuf_addstr(&of->t_path, (char *)path, sizeof(path));
+
+  struct stat st;
+
+  if (stat(path, &st) != 0) {
+    perror("");
+    return -1;
+  }
+
+  of->t_size = st.st_size;
+
+  strbuf_addf(&of->metadata, "blob %lld", of->t_size);
+
+  hash_object_file(of, path);
+
+  return 0;
+}
+
+// ----
+
 void get_object_path(char buffer[], const char *hash) {
   int p_size =
       snprintf(buffer, PATH_MAX, ".tig/objects/%.2s/%s", hash, hash + 2);
@@ -107,9 +141,8 @@ void decompress_object_file(const char *hash) {
   return;
 }
 
-int compress_file_to_obj_file(char *metadata, char *dir_path, char *obj_path,
-                              const char *path) {
-  create_dir(dir_path);
+int compress_file_to_obj_file(struct object_file *of, const char *path) {
+  create_dir(of->dir_path.buf);
 
   FILE *file = fopen(path, "rb");
   if (!file) {
@@ -117,7 +150,7 @@ int compress_file_to_obj_file(char *metadata, char *dir_path, char *obj_path,
     return -1;
   }
 
-  FILE *obj_file = fopen(obj_path, "wb");
+  FILE *obj_file = fopen(of->obj_path.buf, "wb");
   if (!obj_file) {
     fclose(file);
     perror("");
@@ -140,7 +173,7 @@ int compress_file_to_obj_file(char *metadata, char *dir_path, char *obj_path,
   /**
    * Append the metadata to the in buffer to get compressed
    */
-  strcpy((char *)in, metadata);
+  strcpy((char *)in, of->metadata.buf);
   strcat((char *)in, "\0");
   strm.avail_in = strlen((char *)in) + 1;
   strm.next_in = in;
@@ -195,21 +228,7 @@ int compress_file_to_obj_file(char *metadata, char *dir_path, char *obj_path,
   return 0;
 }
 
-int hash_object_file(char *metadata, char *obj_path, char *dir_path,
-                     const char *path) {
-  struct stat st;
-
-  if (stat(path, &st) != 0) {
-    perror("");
-    return -1;
-  }
-
-  unsigned int len = snprintf(metadata, METADATA_MAX, "blob %lld", st.st_size);
-  if (len > METADATA_MAX) {
-    error("Created file metadata is too big");
-    return -1;
-  }
-
+int hash_object_file(struct object_file *of, const char *path) {
   FILE *file = fopen(path, "rb");
   if (!file) {
     return -1;
@@ -223,7 +242,7 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
   EVP_MD_CTX_init(hashctx);
   EVP_DigestInit_ex(hashctx, EVP_sha1(), NULL);
 
-  EVP_DigestUpdate(hashctx, metadata, strlen(metadata) + 1);
+  EVP_DigestUpdate(hashctx, of->metadata.buf, strlen(of->metadata.buf) + 1);
 
   do {
     bytes_read = fread(in_buffer, 1, CHUNK, file);
@@ -243,19 +262,10 @@ int hash_object_file(char *metadata, char *obj_path, char *dir_path,
   for (unsigned int i = 0; i < outlen; i++) {
     snprintf(&str_hash[i * 2], 3, "%02x", hash[i]);
   }
-  printf("%s\n", str_hash);
+  memcpy(of->hash, &str_hash, EVP_MAX_MD_SIZE);
 
-  len = snprintf(dir_path, PATH_MAX, ".tig/objects/%.2s", str_hash);
-  if (len > PATH_MAX) {
-    error("Object file path is too long");
-    return -1;
-  }
-  len = snprintf(obj_path, PATH_MAX, ".tig/objects/%.2s/%s", str_hash,
-                 str_hash + 2);
-  if (len > PATH_MAX) {
-    error("Object file path is too long");
-    return -1;
-  }
+  strbuf_addf(&of->dir_path, ".tig/objects/%.2s", str_hash);
+  strbuf_addf(&of->obj_path, ".tig/objects/%.2s/%s", str_hash, str_hash + 2);
 
   return 0;
 }

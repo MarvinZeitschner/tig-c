@@ -26,7 +26,7 @@ void object_file_release(struct object_file *of);
 
 void get_object_path(char buffer[], const char *hash);
 
-void decompress_object_file(const char *hash);
+int decompress_object_file(const char *hash);
 
 int compress_file_to_obj_file(struct object_file *of, const char *path);
 

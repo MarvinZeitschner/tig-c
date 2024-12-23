@@ -79,7 +79,10 @@ int decompress_object_file(const char *hash) {
 
   struct strbuf sb = STRBUF_INIT;
 
-  decompress_file(&sb, path);
+  if (decompress_file(&sb, path) != 0) {
+    strbuf_release(&sb);
+    return -1;
+  }
 
   char *removed_meta_obj = strchr(sb.buf, '\0') + 1;
   fwrite(removed_meta_obj, 1, sb.len, stdout);
@@ -92,86 +95,9 @@ int decompress_object_file(const char *hash) {
 int compress_file_to_obj_file(struct object_file *of, const char *path) {
   create_dir(of->dir_path.buf);
 
-  FILE *file = fopen(path, "rb");
-  if (!file) {
-    perror("");
+  if (compress_to_file(of->metadata.buf, path, of->obj_path.buf) != 0) {
     return -1;
   }
-
-  FILE *obj_file = fopen(of->obj_path.buf, "wb");
-  if (!obj_file) {
-    fclose(file);
-    perror("");
-    return -1;
-  }
-
-  int ret, flush;
-  unsigned have;
-  z_stream strm = {0};
-  unsigned char in[CHUNK];
-  unsigned char out[CHUNK];
-
-  ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
-  if (ret != Z_OK) {
-    fclose(file);
-    fclose(obj_file);
-    error("Failed to initialize zlib");
-    return -1;
-  }
-  /**
-   * Append the metadata to the in buffer to get compressed
-   */
-  strcpy((char *)in, of->metadata.buf);
-  strcat((char *)in, "\0");
-  strm.avail_in = strlen((char *)in) + 1;
-  strm.next_in = in;
-  strm.avail_out = CHUNK;
-  strm.next_out = out;
-  ret = deflate(&strm, Z_NO_FLUSH);
-  if (ret == Z_STREAM_ERROR) {
-    fclose(file);
-    fclose(obj_file);
-    die("A zlib error occurred");
-  }
-  have = CHUNK - strm.avail_out;
-  if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
-    (void)deflateEnd(&strm);
-    fclose(file);
-    fclose(obj_file);
-    return -1;
-  }
-
-  do {
-    strm.avail_in = fread(in, 1, CHUNK, file);
-    if (ferror(file)) {
-      perror("");
-      (void)deflateEnd(&strm);
-      fclose(file);
-      fclose(obj_file);
-      return -1;
-    }
-    flush = feof(file) ? Z_FINISH : Z_NO_FLUSH;
-    strm.next_in = in;
-
-    do {
-      strm.avail_out = CHUNK;
-      strm.next_out = out;
-      ret = deflate(&strm, flush);
-      assert(ret != Z_STREAM_ERROR);
-      have = CHUNK - strm.avail_out;
-      if (fwrite(out, 1, have, obj_file) != have || ferror(obj_file)) {
-        (void)deflateEnd(&strm);
-        fclose(file);
-        fclose(obj_file);
-        return -1;
-      }
-    } while (strm.avail_out == 0);
-  } while (flush != Z_FINISH);
-  assert(ret == Z_STREAM_END);
-
-  (void)deflateEnd(&strm);
-  fclose(file);
-  fclose(obj_file);
 
   return 0;
 }

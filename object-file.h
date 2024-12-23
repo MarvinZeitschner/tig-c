@@ -4,7 +4,6 @@
 #include "strbuf.h"
 #include <openssl/evp.h>
 
-#define CHUNK 16384
 #define METADATA_MAX 256
 
 struct object_file {
@@ -24,7 +23,7 @@ void object_file_release(struct object_file *of);
 
 //__
 
-void get_object_path(char buffer[], const char *hash);
+int get_object_path(char buffer[], const char *hash);
 
 int decompress_object_file(const char *hash);
 

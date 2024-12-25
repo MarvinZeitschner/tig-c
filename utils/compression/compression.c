@@ -9,7 +9,6 @@
 
 #include "compression.h"
 #include "error.h"
-#include "path.h"
 #include "strbuf.h"
 
 int decompress_file(struct strbuf *sb, char *path) {
@@ -89,12 +88,72 @@ int decompress_file(struct strbuf *sb, char *path) {
      *  We're done when inflate() return Z_STREAM_END
      */
   } while (ret != Z_STREAM_END);
-  // char *removed_meta_obj = strchr(sb->buf, '\0') + 1;
-  // fwrite(removed_meta_obj, 1, sb->len, stdout);
+
   (void)inflateEnd(&strm);
   fclose(file);
 
-  // strbuf_release(&sb);
+  return 0;
+}
+
+int decompress_file_metadata(struct strbuf *sb, char *path) {
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    error("Failed to open file %s: %s", path, strerror(errno));
+    return -1;
+  }
+
+  z_stream strm = {0};
+  unsigned char in_buffer[CHUNK];
+  unsigned char out_buffer[CHUNK];
+
+  int ret = inflateInit(&strm);
+  if (ret != Z_OK) {
+    fclose(file);
+    error("Failed to initialize zlib stream");
+    return -1;
+  }
+
+  do {
+    strm.avail_in = fread(in_buffer, 1, CHUNK, file);
+    if (ferror(file)) {
+      fclose(file);
+      (void)inflateEnd(&strm);
+      error("Error handling file stream in decompression");
+      return -1;
+    }
+    if (strm.avail_in == 0) {
+      break;
+    }
+    strm.next_in = in_buffer;
+
+    do {
+      strm.avail_out = CHUNK;
+      strm.next_out = out_buffer;
+      ret = inflate(&strm, Z_NO_FLUSH);
+      switch (ret) {
+      case Z_NEED_DICT:
+        ret = Z_DATA_ERROR;
+      case Z_DATA_ERROR:
+      case Z_MEM_ERROR:
+      case Z_STREAM_ERROR:
+        fclose(file);
+        (void)inflateEnd(&strm);
+        return -1;
+      }
+      char *null_pos = memchr(out_buffer, '\0', CHUNK - strm.avail_out);
+      if (null_pos) {
+        size_t len = null_pos - (char *)out_buffer;
+        strbuf_addstr(sb, (char *)out_buffer, len);
+        (void)inflateEnd(&strm);
+        fclose(file);
+        return 1;
+      }
+      strbuf_addstr(sb, (char *)out_buffer, CHUNK - strm.avail_out);
+    } while (strm.avail_out == 0);
+  } while (ret != Z_STREAM_END);
+
+  (void)inflateEnd(&strm);
+  fclose(file);
 
   return 0;
 }

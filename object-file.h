@@ -8,11 +8,11 @@
 
 struct object_file {
   struct strbuf t_path;
+  unsigned int t_size;
   struct strbuf dir_path;
   struct strbuf obj_path;
   struct strbuf metadata;
   char hash[EVP_MAX_MD_SIZE];
-  unsigned int t_size;
 };
 
 void object_file_init(struct object_file *of);

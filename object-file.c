@@ -11,6 +11,7 @@
 #include <zlib.h>
 
 #include "error.h"
+#include "objects/object.h"
 #include "path.h"
 #include "strbuf.h"
 #include "utils/compression/compression.h"
@@ -72,6 +73,9 @@ int get_object_path(char buffer[], const char *hash) {
 }
 
 int decompress_object_file(const char *hash) {
+  struct object obj;
+  read_from_database(&obj, hash);
+
   char path[PATH_MAX] = {0};
   if (get_object_path(path, hash) != 0) {
     return -1;

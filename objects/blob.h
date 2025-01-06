@@ -1,10 +1,8 @@
-#ifndef BLOB_H
-#define BLOB_H
-
+#include "strbuf.h"
 #include "object.h"
 
 struct blob {
-  struct object object;
+    struct object object;
+    unsigned long size;
+    struct strbuf data;
 };
-
-#endif

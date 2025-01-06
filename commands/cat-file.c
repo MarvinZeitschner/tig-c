@@ -5,14 +5,12 @@
 #include <stdio.h>
 
 int cat_file(int argc, const char **argv) {
-  if (argc != 1) {
+  if (argc != 2) {
     die("Usage: tig cat-file <hash>\n");
   }
   struct object object;
-  struct strbuf data = STRBUF_INIT;
-  read_object(&object, &data, argv[0]);
   struct strbuf sb = STRBUF_INIT;
-  if (read_object(&object, &sb, argv[0]) != 0) {
+  if (read_object(&object, &sb, argv[1]) != 0) {
     return -1;
   }
 

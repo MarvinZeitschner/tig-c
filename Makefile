@@ -1,11 +1,11 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c2x -Icommands -Iobjects -I. -I/opt/homebrew/opt/openssl/include -Iutils/compression -g
-LDFLAGS = -lz -L/opt/homebrew/opt/openssl/lib -lcrypto
+LDFLAGS = -lz -L/opt/homebrew/opt/openssl/lib -lcrypto -lc
 
 # Target executable and source files
 TARGET = tig
-SRC = main.c path.c object-file.c error.c strbuf.c alloc.c tig.c
+SRC = main.c path.c error.c strbuf.c alloc.c tig.c
 COMMANDS_DIR = commands
 COMMANDS_SRC = $(wildcard $(COMMANDS_DIR)/*.c)
 COMPRESSION_DIR = utils/compression

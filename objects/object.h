@@ -1,4 +1,5 @@
 #include "strbuf.h"
+#include <openssl/evp.h>
 
 #define SHA_SIZE 41
 
@@ -13,3 +14,5 @@ struct object {
 };
 
 int read_object(struct object *object, struct strbuf *data, const char* hash);
+
+int hash_file(char hash[SHA_SIZE], struct strbuf* metadata,const char *path);

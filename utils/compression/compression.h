@@ -7,6 +7,8 @@
 
 int decompress_file(struct strbuf *sb, char *path);
 
+int decompress_file_metadata(struct strbuf *sb, char *path);
+
 int compress_to_file(char *metadata, const char *path, char *path_to_write);
 
 #endif

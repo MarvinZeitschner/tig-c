@@ -1,14 +1,17 @@
 #include "error.h"
 #include "macros.h"
-#include "object-file.h"
+#include "objects/object.h"
+#include "path.h"
+#include "strbuf.h"
+#include "utils/compression/compression.h"
+#include <getopt.h>
+#include <openssl/evp.h>
 #include <stdio.h>
-#include <unistd.h>
 
 int hash_object(int argc, const char *argv[]) {
-  if (argc > 2) {
-    die("Usage: tig hash-object <file> [-w]");
+  if (argc > 3) {
+    die("Usage: tig hash-object [-w] <file> ");
   }
-  const char *path = argv[0];
 
   int opt;
   enum { NONE, WRITE_MODE } mode = NONE;
@@ -19,35 +22,29 @@ int hash_object(int argc, const char *argv[]) {
       mode = WRITE_MODE;
       break;
     default:
-      die("Usage: tig hash-object <file> [-w]");
+      die("Usage: tig hash-object [-w] <file> ");
     }
   }
 
-  if ((int)(argc - 1) != (int)optind - 1) {
-    die("Usage: tig hash-object <file> [-w]");
+  const char *path = argv[optind];
+
+  char hash[EVP_MAX_MD_SIZE];
+  struct strbuf metadata;
+  if (hash_file(hash, &metadata, path) == -1) {
+    die("Error hashing file: %s", path);
   }
-
-  struct object_file of;
-  object_file_init(&of);
-  if (object_file_get(&of, path) != 0) {
-    object_file_release(&of);
-    return -1;
-  }
-
-  // printf("\n\n %s,\n %s,\n %s,\n %s,\n %s,\n %d\n \n", of.t_path.buf,
-  //        of.dir_path.buf, of.obj_path.buf, of.hash, of.metadata.buf,
-  //        of.t_size);
-
-  printf("%s\n", of.hash);
+  printf("%s\n", hash);
 
   if (mode == WRITE_MODE) {
-    if (compress_file_to_obj_file(&of, path) != 0) {
-      object_file_release(&of);
-      return -1;
-    }
-  }
+    struct strbuf path_to_write = STRBUF_INIT;
+    strbuf_addf(&path_to_write, ".tig/objects/%.2s/%s", hash, hash + 2);
+    struct strbuf obj_dir = STRBUF_INIT;
+    strbuf_addf(&obj_dir, ".tig/objects/%.2s", hash);
 
-  object_file_release(&of);
+    create_dir(obj_dir.buf);
+
+    compress_to_file(metadata.buf, path, path_to_write.buf);
+  }
 
   return 0;
 }

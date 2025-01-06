@@ -1,17 +1,19 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c2x -Icommands -I. -I/opt/homebrew/opt/openssl/include -Iutils/compression -g
-LDFLAGS = -lz -L/opt/homebrew/opt/openssl/lib -lcrypto
+CFLAGS = -Wall -Wextra -pedantic -std=c2x -Icommands -Iobjects -I. -I/opt/homebrew/opt/openssl/include -Iutils/compression -g
+LDFLAGS = -lz -L/opt/homebrew/opt/openssl/lib -lcrypto -lc
 
 # Target executable and source files
 TARGET = tig
-SRC = main.c path.c object-file.c error.c strbuf.c alloc.c tig.c tree-file.c
+SRC = main.c path.c error.c strbuf.c alloc.c tig.c
 COMMANDS_DIR = commands
 COMMANDS_SRC = $(wildcard $(COMMANDS_DIR)/*.c)
 COMPRESSION_DIR = utils/compression
 COMPRESSION_SRC = $(wildcard $(COMPRESSION_DIR)/*.c)
+OBJECTS_DIR = objects
+OBJECTS_SRC = $(wildcard $(OBJECTS_DIR)/*.c)
 
-OBJ = $(SRC:.c=.o) $(COMMANDS_SRC:.c=.o) $(COMPRESSION_SRC:.c=.o)
+OBJ = $(SRC:.c=.o) $(COMMANDS_SRC:.c=.o) $(COMPRESSION_SRC:.c=.o) $(OBJECTS_SRC:.c=.o)
 
 # Default target
 all: $(TARGET)

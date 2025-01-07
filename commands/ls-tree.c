@@ -1,4 +1,5 @@
 #include "error.h"
+#include "objects/object.h"
 #include <getopt.h>
 #include <stdio.h>
 
@@ -30,6 +31,9 @@ int ls_tree(int argc, const char **argv) {
   } else {
     die("Error: No tree SHA provided.");
   }
+
+  struct object object;
+  get_object(&object, argv[optind]);
 
   return 0;
 }

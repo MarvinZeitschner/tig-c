@@ -24,5 +24,12 @@ void write_to_file(const char *filename, const char *text) {
 int hash_to_obj_path(struct strbuf *sb, const char *hash) {
   strbuf_addf(sb, ".tig/objects/%.2s/%s", hash, hash + 2);
 
+  // struct stat st;
+
+  // if (stat(sb->buf, &st) != 0) {
+  //   perror("");
+  //   return -1;
+  // }
+
   return 0;
 }

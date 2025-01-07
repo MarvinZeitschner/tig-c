@@ -9,12 +9,15 @@ int cat_file(int argc, const char **argv) {
     die("Usage: tig cat-file <hash>\n");
   }
   struct object object;
-  struct strbuf sb = STRBUF_INIT;
-  if (read_object(&object, &sb, argv[1]) != 0) {
+  get_object(&object, argv[1]);
+  struct strbuf data = STRBUF_INIT;
+
+  if (read_object(&object, &data) != 0) {
     return -1;
   }
 
-  fwrite(sb.buf, 1, sb.len - 1, stdout);
-  strbuf_release(&sb);
+  fwrite(data.buf, 1, data.len - 1, stdout);
+  strbuf_release(&data);
+  // TODO: release object
   return 0;
 }

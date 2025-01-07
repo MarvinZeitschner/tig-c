@@ -9,28 +9,18 @@
 #include <string.h>
 #include <sys/stat.h>
 
-int read_object(struct object *object, struct strbuf *data, const char *hash) {
+int get_object(struct object *object, const char *hash) {
   struct strbuf path = STRBUF_INIT;
 
   hash_to_obj_path(&path, hash);
 
-  struct strbuf raw_data = STRBUF_INIT;
-  if (decompress_file(&raw_data, path.buf) == -1) {
-    strbuf_release(&path);
-    return -1;
-  }
-  strncpy(object->sha1, hash, SHA_SIZE - 1);
-  object->sha1[SHA_SIZE - 1] = '\0';
-  strbuf_release(&path);
-
   struct strbuf metadata = STRBUF_INIT;
-  strbuf_addstr(&metadata, raw_data.buf, sizeof(raw_data.buf));
-
-  strbuf_addstr(data, raw_data.buf + metadata.len,
-                strlen(raw_data.buf + metadata.len) + 1);
+  decompress_file_metadata(&metadata, path.buf);
 
   strtok(metadata.buf, " ");
 
+  strncpy(object->sha1, hash, SHA_SIZE - 1);
+  object->sha1[SHA_SIZE - 1] = '\0';
   if (!strcmp(metadata.buf, "blob")) {
     object->type = BLOB;
   } else {
@@ -39,12 +29,31 @@ int read_object(struct object *object, struct strbuf *data, const char *hash) {
 
   strbuf_release(&path);
   strbuf_release(&metadata);
-  strbuf_release(&raw_data);
 
   return 0;
 }
 
-int hash_file(char hash[SHA_SIZE], struct strbuf* metadata,const char *path) {
+int read_object(struct object *object, struct strbuf *data) {
+  struct strbuf path = STRBUF_INIT;
+
+  hash_to_obj_path(&path, object->sha1);
+
+  struct strbuf raw_data = STRBUF_INIT;
+  if (decompress_file(&raw_data, path.buf) == -1) {
+    strbuf_release(&path);
+    return -1;
+  }
+
+  char *content = strchr(raw_data.buf, '\0') + 1;
+  strbuf_addstr(data, content, strlen(content));
+
+  strbuf_release(&raw_data);
+  strbuf_release(&path);
+
+  return 0;
+}
+
+int hash_file(char hash[SHA_SIZE], struct strbuf *metadata, const char *path) {
   struct stat st;
 
   if (stat(path, &st) != 0) {

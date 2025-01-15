@@ -1,9 +1,9 @@
 #include "error.h"
 #include "macros.h"
-#include "objects/object.h"
+#include "object.h"
 #include "path.h"
 #include "strbuf.h"
-#include "utils/compression/compression.h"
+#include "z_compression.h"
 #include <getopt.h>
 #include <openssl/evp.h>
 #include <stdio.h>

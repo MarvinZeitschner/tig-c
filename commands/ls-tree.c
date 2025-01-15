@@ -3,6 +3,8 @@
 #include <getopt.h>
 #include <stdio.h>
 
+enum { DEFAULT, NAME_ONLY } mode = DEFAULT;
+
 int ls_tree(int argc, const char **argv) {
   printf("lstree\n");
   if (argc > 3) {
@@ -19,21 +21,24 @@ int ls_tree(int argc, const char **argv) {
                             NULL)) != -1) {
     switch (opt) {
     case 'n':
-      printf("name only\n");
+      mode = NAME_ONLY;
       break;
     default:
       die("Unknown option");
     }
   }
 
-  if (optind < argc) {
-    printf("Remaining argument (tree-sha): %s\n", argv[optind]);
-  } else {
+  if (optind > argc) {
     die("Error: No tree SHA provided.");
   }
 
   struct object object;
   get_object(&object, argv[optind]);
+
+  struct tree tree;
+  get_tree(&object, &tree);
+
+  // TODO: free object
 
   return 0;
 }

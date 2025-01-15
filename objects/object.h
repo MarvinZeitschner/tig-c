@@ -8,6 +8,7 @@ enum obj_type { BLOB, TREE };
 struct object {
   enum obj_type type;
   char sha1[SHA_SIZE];
+  unsigned int size;
 };
 
 enum type {
@@ -17,10 +18,8 @@ enum type {
 };
 
 struct tree {
-  struct strbuf name;
-  char sha1[SHA_SIZE];
   struct object object;
-  struct tree_entry **entry;
+  struct tree_entry *entry;
 };
 
 struct tree_entry {
@@ -60,3 +59,5 @@ int read_object(struct object *object, struct strbuf *data);
  *
  */
 int hash_file(char hash[SHA_SIZE], struct strbuf *metadata, const char *path);
+
+int get_tree(struct object *object, struct tree *tree);

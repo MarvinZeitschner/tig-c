@@ -8,9 +8,9 @@
 #include <sys/stat.h>
 #include <zlib.h>
 
-#include "compression.h"
 #include "error.h"
 #include "strbuf.h"
+#include "z_compression.h"
 
 int decompress_file(struct strbuf *sb, char *path) {
   FILE *file = fopen(path, "rb");

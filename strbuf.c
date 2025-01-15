@@ -64,3 +64,18 @@ void strbuf_addf(struct strbuf *sb, const char *fmt, ...) {
 
   va_end(args);
 }
+
+char *strbuf_strtok_null(struct strbuf *sb, size_t *offset) {
+  if (*offset >= sb->alloc) {
+    return NULL;
+  }
+
+  char *token = &sb->buf[*offset];
+  while (*offset < sb->alloc && sb->buf[*offset] != '\0') {
+    (*offset)++;
+  }
+
+  (*offset)++;
+
+  return token;
+}

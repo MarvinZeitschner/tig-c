@@ -2,8 +2,10 @@
 #include "error.h"
 #include "path.h"
 #include "strbuf.h"
-#include "utils/compression/compression.h"
+#include "z_compression.h"
 #include <openssl/evp.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,17 +17,37 @@ int get_object(struct object *object, const char *hash) {
   hash_to_obj_path(&path, hash);
 
   struct strbuf metadata = STRBUF_INIT;
-  decompress_file_metadata(&metadata, path.buf);
+  if (decompress_file_metadata(&metadata, path.buf) == -1) {
+    strbuf_release(&path);
+    strbuf_release(&metadata);
+    return -1;
+  }
 
-  strtok(metadata.buf, " ");
+  // TODO: write strbuf_strtok() as strtok modifies the strbuf
+  char *token = strtok(metadata.buf, " ");
+  char *size_str = strtok(NULL, "\0");
 
   strncpy(object->sha1, hash, SHA_SIZE - 1);
   object->sha1[SHA_SIZE - 1] = '\0';
-  if (!strcmp(metadata.buf, "blob")) {
+  if (!strcmp(token, "blob")) {
     object->type = BLOB;
   } else {
     object->type = TREE;
   }
+  char *endptr;
+  long num = strtol(size_str, &endptr, 10);
+  if (endptr == size_str) {
+    error("No digits were found.\n");
+    strbuf_release(&path);
+    strbuf_release(&metadata);
+    return -1;
+  } else if (*endptr != '\0') {
+    strbuf_release(&path);
+    strbuf_release(&metadata);
+    return -1;
+    error("Invalid character: %c\n", *endptr);
+  }
+  object->size = num;
 
   strbuf_release(&path);
   strbuf_release(&metadata);
@@ -94,6 +116,44 @@ int hash_file(char hash[SHA_SIZE], struct strbuf *metadata, const char *path) {
   for (unsigned int i = 0; i < outlen; i++) {
     snprintf(&hash[i * 2], 3, "%02x", hash_buf[i]);
   }
+
+  return 0;
+}
+
+int get_tree(struct object *object, struct tree *tree) {
+  struct strbuf path = STRBUF_INIT;
+
+  hash_to_obj_path(&path, object->sha1);
+
+  struct strbuf raw_data = STRBUF_INIT;
+
+  decompress_file(&raw_data, path.buf);
+
+  char *content = strchr(raw_data.buf, '\0') + 1;
+  char *end = content + object->size;
+
+  while (content < end) {
+    char *mode = strtok(content, " ");
+    content = content + strlen(mode) + 1;
+    char *name = strtok(content, "\0");
+    content = content + strlen(name) + 1;
+    char *raw_hash = strtok(content, " ");
+
+    char hash[SHA_SIZE];
+
+    for (int i = 0; i < 20; i++) {
+      snprintf(&hash[i * 2], 3, "%02x", (unsigned char)raw_hash[i]);
+    }
+
+    struct object object;
+    get_object(&object, hash);
+
+    printf("%s %u %s %s\n", mode, object.type, hash, name);
+
+    content = content + 20;
+  }
+
+  strbuf_release(&raw_data);
 
   return 0;
 }

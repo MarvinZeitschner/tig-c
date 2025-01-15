@@ -12,9 +12,9 @@ struct object {
 };
 
 enum type {
-  regular = 100644,
-  executable = 100755,
-  symbolik = 120000,
+  REGULAR = 100644,
+  EXECUTABLE = 100755,
+  SYMLINK = 120000,
 };
 
 struct tree {
@@ -24,7 +24,8 @@ struct tree {
 
 struct tree_entry {
   enum type type;
-  struct strbuf name;
+  enum obj_type obj_type;
+  struct strbuf *name;
   char sha1[SHA_SIZE];
 };
 
@@ -60,4 +61,9 @@ int read_object(struct object *object, struct strbuf *data);
  */
 int hash_file(char hash[SHA_SIZE], struct strbuf *metadata, const char *path);
 
+char *obj_type_to_str(struct object *object);
+
 int get_tree(struct object *object, struct tree *tree);
+
+int init_tree_entry(struct tree_entry *entry, char *mode,
+                    enum obj_type obj_type, char *name, char hash[SHA_SIZE]);

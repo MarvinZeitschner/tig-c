@@ -120,6 +120,15 @@ int hash_file(char hash[SHA_SIZE], struct strbuf *metadata, const char *path) {
   return 0;
 }
 
+char *obj_type_to_str(struct object *object) {
+  switch (object->type) {
+  case BLOB:
+    return "blob";
+  case TREE:
+    return "tree";
+  };
+}
+
 int get_tree(struct object *object, struct tree *tree) {
   struct strbuf path = STRBUF_INIT;
 
@@ -148,12 +157,55 @@ int get_tree(struct object *object, struct tree *tree) {
     struct object object;
     get_object(&object, hash);
 
-    printf("%s %u %s %s\n", mode, object.type, hash, name);
+    struct tree_entry entry;
+    init_tree_entry(&entry, mode, object.type, name, hash);
+
+    printf("%s %s %s %s\n", mode, obj_type_to_str(&object), hash, name);
 
     content = content + 20;
   }
 
   strbuf_release(&raw_data);
+
+  return 0;
+}
+
+int init_tree_entry(struct tree_entry *entry, char *mode,
+                    enum obj_type obj_type, char *name, char hash[SHA_SIZE]) {
+
+  enum type file_type;
+  char *endptr;
+  long num = strtol(mode, &endptr, 10);
+  if (endptr == mode) {
+    error("No digits were found.\n");
+    return -1;
+  } else if (*endptr != '\0') {
+    return -1;
+    error("Invalid character: %c\n", *endptr);
+  }
+  if (num == REGULAR) {
+    file_type = REGULAR;
+  } else if (num == EXECUTABLE) {
+    file_type = EXECUTABLE;
+  } else if (num == SYMLINK) {
+    file_type = SYMLINK;
+  } else {
+    error("Wrong format when parsing the mode");
+    return -1;
+  }
+  entry->type = file_type;
+
+  entry->obj_type = obj_type;
+
+  entry->name = (struct strbuf *)malloc(sizeof(struct strbuf));
+  if (!entry->name) {
+    error("Memory allocation failed at 'init_tree_entry'");
+    return -1;
+  }
+  strbuf_addstr(entry->name, name, sizeof(name));
+
+  strncpy(entry->sha1, hash, sizeof(entry->sha1) - 1);
+  entry->sha1[SHA_SIZE - 1] = '\0';
 
   return 0;
 }

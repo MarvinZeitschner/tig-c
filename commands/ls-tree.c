@@ -38,7 +38,5 @@ int ls_tree(int argc, const char **argv) {
   struct tree tree;
   get_tree(&object, &tree);
 
-  // TODO: free object
-
   return 0;
 }
